@@ -2,9 +2,9 @@ import L from "leaflet";
 
 L.VectorField = (L.Layer ? L.Layer : L.Class).extend({
   options: {
-    vectorArrowColor: false, 
-    size: 30, 
-    colors: ""
+    vectorArrowColor: false,
+    size: 30,
+    colors: "",
   },
   initialize: function (data, options) {
     this._data = data;
