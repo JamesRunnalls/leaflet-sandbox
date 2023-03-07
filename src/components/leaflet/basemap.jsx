@@ -22,7 +22,7 @@ class Basemap extends Component {
     });
     return L.floatgeotiff(data, {
       min: 0,
-      max: 7,
+      max: 10,
       palette: [
         { color: [0, 0, 128], point: 0 },
         { color: [51, 102, 255], point: 0.142857142857143 },
@@ -120,7 +120,7 @@ class Basemap extends Component {
       "Flow Field (Delft3D)": vectorfield,
     };
 
-    var layerControl = L.control.layers(baseMaps, overlayMaps).addTo(this.map);
+    L.control.layers(baseMaps, overlayMaps).addTo(this.map);
   }
 
   render() {
