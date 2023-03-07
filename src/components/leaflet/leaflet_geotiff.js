@@ -1,13 +1,12 @@
 import L from "leaflet";
 import * as GeoTIFF from "geotiff";
 
-L.LeafletGeotiff = L.ImageOverlay.extend({
+L.Geotiff = L.ImageOverlay.extend({
   options: {
     opacity: 1,
   },
-
   initialize: function (data, options) {
-    this._url = "snowlines_geotiff.tif";
+    this._url = "geotiff.tif";
     this._data = data;
     this.raster = {};
     L.Util.setOptions(this, options);
@@ -274,8 +273,8 @@ L.LeafletGeotiff = L.ImageOverlay.extend({
   },
 });
 
-L.leafletGeotiff = function (data, options) {
-  return new L.LeafletGeotiff(data, options);
+L.geotiff = function (data, options) {
+  return new L.Geotiff(data, options);
 };
 
 if (typeof module !== "undefined" && typeof module.exports !== "undefined") {
