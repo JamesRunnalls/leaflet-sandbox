@@ -231,6 +231,22 @@ class Basemap extends Component {
       }
     );
 
+    var s3_secchi_geotiff = await this.addFloatGeotiff(
+      "https://datalakes-eawag.s3.eu-central-1.amazonaws.com/leaflet-sandbox/s3_secchi_singleband_float.tiff",
+      {
+        unit: "m",
+        min: 0,
+        max: 5,
+        palette: [
+          { color: [253, 231, 37], point: 0 },
+          { color: [94, 201, 98], point: 0.25 },
+          { color: [33, 145, 140], point: 0.5 },
+          { color: [59, 82, 139], point: 0.75 },
+          { color: [68, 1, 84], point: 1 },
+        ],
+      }
+    );
+
     var streamlines = await this.addStreamlines(
       "https://datalakes-eawag.s3.eu-central-1.amazonaws.com/leaflet-sandbox/streamlines.json"
     );
@@ -248,6 +264,7 @@ class Basemap extends Component {
       "Sentinel 3 (GeoTiff)": sentinel3_geotiff,
       "TSM (S2)": tsm_geotiff,
       "Secchi (S2)": secchi_geotiff,
+      "Secchi (S3)": s3_secchi_geotiff,
       "Streamlines (Delft3D)": streamlines,
       "Flow Field (Delft3D)": vectorfield,
     };
