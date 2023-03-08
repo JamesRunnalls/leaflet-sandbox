@@ -1,13 +1,34 @@
 import L from "leaflet";
+import { min, max } from "d3";
 
 L.VectorField = (L.Layer ? L.Layer : L.Class).extend({
   options: {
     vectorArrowColor: false,
-    size: 30,
-    colors: "",
+    size: 20,
+    min: false,
+    max: false,
+    palette: [
+      { color: [68, 1, 84], point: 0 },
+      { color: [59, 82, 139], point: 0.25 },
+      { color: [33, 145, 140], point: 0.5 },
+      { color: [94, 201, 98], point: 0.75 },
+      { color: [253, 231, 37], point: 1 },
+    ],
   },
   initialize: function (data, options) {
     this._data = data;
+    if (!("min" in options) || !("min" in options)) {
+      let arr = data
+        .flat()
+        .filter((d) => d != null)
+        .map((d) => Math.abs(Math.sqrt(Math.pow(d[3], 2) + Math.pow(d[4], 2))));
+      if (!("min" in options)) {
+        options["min"] = min(arr);
+      }
+      if (!("max" in options)) {
+        options["max"] = max(arr);
+      }
+    }
     L.setOptions(this, options);
   },
 
@@ -200,19 +221,23 @@ L.VectorField = (L.Layer ? L.Layer : L.Class).extend({
   },
 
   _drawArrow: function (cell, ctx, size) {
-    var { min, max, vectorArrowColor, colors } = this.options;
     var { center, value, rotation } = cell;
+
+    size =
+      size * 0.5 +
+      (size * (value - this.options.min)) /
+        (this.options.max - this.options.min);
 
     // Arrow Center
     ctx.save();
     ctx.translate(center.x, center.y);
 
     // Arrow Color
-    var color = "#000000";
-    if (vectorArrowColor) {
-      color = this._getColor(value, min, max, colors);
+    var color = [0, 0, 0];
+    if (this.options.vectorArrowColor) {
+      color = this._getColor(value);
     }
-    ctx.strokeStyle = color;
+    ctx.strokeStyle = `rgb(${color.join(",")})`;
 
     // Arrow Rotation
     if (value === 0) rotation = Math.PI / 4;
@@ -220,7 +245,7 @@ L.VectorField = (L.Layer ? L.Layer : L.Class).extend({
 
     // Set other properties
     ctx.globalAlpha = 1;
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 2;
 
     // Draw Path
     if (value === 0) {
@@ -235,9 +260,9 @@ L.VectorField = (L.Layer ? L.Layer : L.Class).extend({
       ctx.beginPath();
       ctx.moveTo(-size / 2, 0);
       ctx.lineTo(+size / 2, 0);
-      ctx.moveTo(size * 0.25, -size * 0.25);
+      ctx.moveTo(size * 0.15, -size * 0.15);
       ctx.lineTo(+size / 2, 0);
-      ctx.lineTo(size * 0.25, size * 0.25);
+      ctx.lineTo(size * 0.15, size * 0.15);
       ctx.stroke();
       ctx.restore();
     }
@@ -272,7 +297,7 @@ L.VectorField = (L.Layer ? L.Layer : L.Class).extend({
     var stride = Math.max(1, Math.floor((1.2 * size) / pixelSize));
 
     if (stride === 1) {
-      size = pixelSize * 0.9;
+      size = pixelSize * 0.5;
     }
 
     var maxRow = (Math.floor(nRows / stride) - 1) * stride + 1;
@@ -344,31 +369,43 @@ L.VectorField = (L.Layer ? L.Layer : L.Class).extend({
     return this._hex(rgb[0]) + this._hex(rgb[1]) + this._hex(rgb[2]);
   },
 
-  _getColor: function (value, min, max, colors) {
-    var loc = (value - min) / (max - min);
-    if (loc < 0 || loc > 1) {
-      return "#fff";
-    } else {
-      var index = 0;
-      for (var i = 0; i < colors.length - 1; i++) {
-        if (loc >= colors[i].point && loc <= colors[i + 1].point) {
-          index = i;
-        }
-      }
-      var color1 = this._convertToRGB(colors[index].color);
-      var color2 = this._convertToRGB(colors[index + 1].color);
-
-      var f =
-        (loc - colors[index].point) /
-        (colors[index + 1].point - colors[index].point);
-      var rgb = [
-        color1[0] + (color2[0] - color1[0]) * f,
-        color1[1] + (color2[1] - color1[1]) * f,
-        color1[2] + (color2[2] - color1[2]) * f,
-      ];
-
-      return `#${this._convertToHex(rgb)}`;
+  _getColor: function (value) {
+    if (value === null || isNaN(value)) {
+      return false;
     }
+    if (value > this.options.max) {
+      return this.options.palette[this.options.palette.length - 1].color;
+    }
+    if (value < this.options.min) {
+      return this.options.palette[0].color;
+    }
+    var loc =
+      (value - this.options.min) / (this.options.max - this.options.min);
+
+    var index = 0;
+    for (var i = 0; i < this.options.palette.length - 1; i++) {
+      if (
+        loc >= this.options.palette[i].point &&
+        loc <= this.options.palette[i + 1].point
+      ) {
+        index = i;
+      }
+    }
+    var color1 = this.options.palette[index].color;
+    var color2 = this.options.palette[index + 1].color;
+
+    var f =
+      (loc - this.options.palette[index].point) /
+      (this.options.palette[index + 1].point -
+        this.options.palette[index].point);
+
+    var rgb = [
+      color1[0] + (color2[0] - color1[0]) * f,
+      color1[1] + (color2[1] - color1[1]) * f,
+      color1[2] + (color2[2] - color1[2]) * f,
+    ];
+
+    return rgb;
   },
 
   _redraw: function () {

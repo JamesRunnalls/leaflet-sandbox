@@ -110,7 +110,7 @@ class Basemap extends Component {
   addVectorfield = async (url) => {
     var { data } = await axios.get(url);
     var map = this.map;
-    var vectorfield = L.vectorfield(data, {});
+    var vectorfield = L.vectorfield(data, { vectorArrowColor: true });
     var vectorfieldtooltip = vectorfield.bindTooltip("my tooltip text", {
       permanent: false,
       direction: "top",
@@ -258,6 +258,8 @@ class Basemap extends Component {
     var baseMaps = {
       mapbox: mapbox,
     };
+
+    vectorfield.addTo(this.map);
 
     var overlayMaps = {
       "Sentinel 2 (WMS)": sentinel2_wms,
