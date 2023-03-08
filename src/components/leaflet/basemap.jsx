@@ -16,40 +16,141 @@ class Basemap extends Component {
     return L.geotiff(data, {});
   };
 
-  addFloatGeotiff = async (url) => {
+  addFloatGeotiff = async (url, options) => {
     var { data } = await axios.get(url, {
       responseType: "arraybuffer",
     });
-    return L.floatgeotiff(data, {
-      min: 0,
-      max: 10,
-      palette: [
-        { color: [0, 0, 128], point: 0 },
-        { color: [51, 102, 255], point: 0.142857142857143 },
-        { color: [0, 176, 220], point: 0.285714285714286 },
-        { color: [0, 153, 51], point: 0.428571428571429 },
-        { color: [255, 255, 91], point: 0.571428571428571 },
-        { color: [230, 51, 0], point: 0.714285714285714 },
-        { color: [204, 0, 0], point: 0.857142857142857 },
-        { color: [128, 0, 0], point: 1 },
-      ],
+    var map = this.map;
+    var floatgeotiff = L.floatgeotiff(data, options);
+    var floatgeotifftooltip = floatgeotiff.bindTooltip("my tooltip text", {
+      permanent: false,
+      direction: "top",
+      className: "basic-tooltip",
+      opacity: 1,
     });
+    floatgeotiff.on("mousemove", function (e) {
+      let value = e.value;
+      if (value) {
+        value = Math.round(value * 1000) / 1000;
+        let html = `${value}${options.unit}`;
+        floatgeotifftooltip._tooltip._content = html;
+        floatgeotifftooltip.openTooltip(e.latlng);
+      } else {
+        floatgeotifftooltip.closeTooltip();
+      }
+    });
+    floatgeotiff.on("click", function (e) {
+      floatgeotifftooltip.closeTooltip();
+      let value = e.value;
+      if (value) {
+        value = Math.round(value * 1000) / 1000;
+        let inner = `${value}${options.unit}`;
+        let html = `<div>${String(inner)}</div>`;
+        L.popup({ className: "leaflet-popup" })
+          .setLatLng(e.latlng)
+          .setContent(html)
+          .openOn(map);
+      }
+    });
+    return floatgeotiff;
   };
 
   addStreamlines = async (url) => {
     var { data } = await axios.get(url);
-    return L.streamlines(data, {
+    var map = this.map;
+    var streamlines = L.streamlines(data, {
       xMin: 6.153,
       xMax: 6.93,
       yMin: 46.206,
       yMax: 46.519,
       paths: 5000,
     });
+    var streamlinestooltip = streamlines.bindTooltip("", {
+      permanent: false,
+      direction: "top",
+      className: "basic-tooltip",
+      opacity: 1,
+    });
+    streamlines.on("mousemove", function (e) {
+      let { u, v } = e.value;
+      if (u && v) {
+        let mag = Math.round(Math.sqrt(u ** 2 + v ** 2) * 1000) / 1000;
+        let deg = Math.round((Math.atan2(u / mag, v / mag) * 180) / Math.PI);
+        if (deg < 0) deg = 360 + deg;
+        let html = `${mag}m/s ${deg}°`;
+        streamlinestooltip._tooltip._content = html;
+        streamlinestooltip.openTooltip(e.latlng);
+      } else {
+        streamlinestooltip.closeTooltip();
+      }
+    });
+    streamlines.on("click", function (e) {
+      streamlinestooltip.closeTooltip();
+      if (e.value !== null && e.value.u !== null) {
+        let { u, v } = e.value;
+        let { lat, lng } = e.latlng;
+        lat = Math.round(lat * 1000) / 1000;
+        lng = Math.round(lng * 1000) / 1000;
+        console.log(lat, lng);
+        let mag = Math.round(Math.sqrt(u ** 2 + v ** 2) * 1000) / 1000;
+        let deg = Math.round((Math.atan2(u / mag, v / mag) * 180) / Math.PI);
+        if (deg < 0) deg = 360 + deg;
+        let value = Math.round(mag * 1000) / 1000;
+        let inner = `${value}m/s ${deg}°`;
+        let html = `<div>${String(inner)} </div>`;
+        L.popup({ className: "leaflet-popup" })
+          .setLatLng(e.latlng)
+          .setContent(html)
+          .openOn(map);
+      }
+    });
+    return streamlines;
   };
 
   addVectorfield = async (url) => {
     var { data } = await axios.get(url);
-    return L.vectorfield(data, {});
+    var map = this.map;
+    var vectorfield = L.vectorfield(data, {});
+    var vectorfieldtooltip = vectorfield.bindTooltip("my tooltip text", {
+      permanent: false,
+      direction: "top",
+      className: "basic-tooltip",
+      opacity: 1,
+    });
+    vectorfield.on("mousemove", function (e) {
+      let { u, v } = e.value;
+      if (u && v) {
+        let mag = Math.round(Math.sqrt(u ** 2 + v ** 2) * 1000) / 1000;
+        let deg = Math.round((Math.atan2(u / mag, v / mag) * 180) / Math.PI);
+        if (deg < 0) deg = 360 + deg;
+        let html = `${mag}m/s ${deg}°`;
+        vectorfieldtooltip._tooltip._content = html;
+        vectorfieldtooltip.openTooltip(e.latlng);
+      } else {
+        vectorfieldtooltip.closeTooltip();
+      }
+    });
+    vectorfield.on("click", function (e) {
+      vectorfieldtooltip.closeTooltip();
+      if (e.value !== null && e.value.u !== null) {
+        let { u, v } = e.value;
+        let { lat, lng } = e.latlng;
+        lat = Math.round(lat * 1000) / 1000;
+        lng = Math.round(lng * 1000) / 1000;
+        console.log(lat, lng);
+        let mag = Math.round(Math.sqrt(u ** 2 + v ** 2) * 1000) / 1000;
+        let deg = Math.round((Math.atan2(u / mag, v / mag) * 180) / Math.PI);
+        if (deg < 0) deg = 360 + deg;
+        let value = Math.round(mag * 1000) / 1000;
+        let inner = `${value}m/s ${deg}°`;
+        let html = `<div>${String(inner)}</div>`;
+        L.popup({ className: "leaflet-popup" })
+          .setLatLng(e.latlng)
+          .setContent(html)
+          .openOn(map);
+      }
+    });
+    return vectorfield;
   };
 
   addSentinel = (url) => {
@@ -97,7 +198,35 @@ class Basemap extends Component {
     );
 
     var tsm_geotiff = await this.addFloatGeotiff(
-      "https://datalakes-eawag.s3.eu-central-1.amazonaws.com/leaflet-sandbox/s2_tsm_singleband_float.tiff"
+      "https://datalakes-eawag.s3.eu-central-1.amazonaws.com/leaflet-sandbox/s2_tsm_singleband_float.tiff",
+      {
+        unit: "g m-3",
+        min: 0,
+        max: 8,
+        palette: [
+          { color: [68, 1, 84], point: 0 },
+          { color: [59, 82, 139], point: 0.25 },
+          { color: [33, 145, 140], point: 0.5 },
+          { color: [94, 201, 98], point: 0.75 },
+          { color: [253, 231, 37], point: 1 },
+        ],
+      }
+    );
+
+    var secchi_geotiff = await this.addFloatGeotiff(
+      "https://datalakes-eawag.s3.eu-central-1.amazonaws.com/leaflet-sandbox/s2_secchi_singleband_float.tiff",
+      {
+        unit: "m",
+        min: 0,
+        max: 5,
+        palette: [
+          { color: [253, 231, 37], point: 0 },
+          { color: [94, 201, 98], point: 0.25 },
+          { color: [33, 145, 140], point: 0.5 },
+          { color: [59, 82, 139], point: 0.75 },
+          { color: [68, 1, 84], point: 1 },
+        ],
+      }
     );
 
     var streamlines = await this.addStreamlines(
@@ -116,11 +245,14 @@ class Basemap extends Component {
       "Sentinel 2 (WMS)": sentinel2_wms,
       "Sentinel 3 (GeoTiff)": sentinel3_geotiff,
       "TSM (S2)": tsm_geotiff,
+      "Secchi (S2)": secchi_geotiff,
       "Streamlines (Delft3D)": streamlines,
       "Flow Field (Delft3D)": vectorfield,
     };
 
-    L.control.layers(baseMaps, overlayMaps).addTo(this.map);
+    L.control
+      .layers(baseMaps, overlayMaps, { collapsed: false })
+      .addTo(this.map);
   }
 
   render() {

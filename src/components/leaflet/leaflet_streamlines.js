@@ -316,7 +316,7 @@ L.Streamlines = (L.Layer ? L.Layer : L.Class).extend({
       var e = this._queryValue(t);
       this.fire("mousemove", e);
     } catch (e) {
-      console.error("Leaflet streamlines mousemove event failed.");
+      console.error("Leaflet streamlines mousemove event failed.", e);
     }
   },
 
@@ -329,7 +329,7 @@ L.Streamlines = (L.Layer ? L.Layer : L.Class).extend({
       var e = this._queryValue(t);
       this.fire("click", e);
     } catch (e) {
-      console.error("Leaflet streamlines click event failed.");
+      console.error("Leaflet streamlines click event failed.", e);
     }
   },
 

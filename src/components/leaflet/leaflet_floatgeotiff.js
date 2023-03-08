@@ -34,7 +34,9 @@ L.FloatGeotiff = L.ImageOverlay.extend({
       this._initImage();
     }
     map._panes.overlayPane.appendChild(this._image);
+    map.on("click", this._onClick, this);
     map.on("moveend", this._reset, this);
+    map.on("mousemove", this._onMousemove, this);
     if (map.options.zoomAnimation && L.Browser.any3d) {
       map.on("zoomanim", this._animateZoom, this);
     }
@@ -43,6 +45,8 @@ L.FloatGeotiff = L.ImageOverlay.extend({
   onRemove: function (map) {
     map.getPanes().overlayPane.removeChild(this._image);
     map.off("moveend", this._reset, this);
+    map.off("click", this._onClick, this);
+    map.off("mousemove", this._onMousemove, this);
     if (map.options.zoomAnimation) {
       map.off("zoomanim", this._animateZoom, this);
     }
@@ -81,7 +85,7 @@ L.FloatGeotiff = L.ImageOverlay.extend({
               this._rasterBounds._southWest.lat)
         );
       var i = y * this.raster.width + x;
-      return this.raster.data[i];
+      return this.raster.data[0][i];
     } catch (err) {
       return undefined;
     }
@@ -239,7 +243,8 @@ L.FloatGeotiff = L.ImageOverlay.extend({
     var e = Math.abs(Math.min(args.xFinish - args.rasterPixelBounds.max.x, 0));
     var s = Math.abs(Math.min(args.yFinish - args.rasterPixelBounds.max.y, 0));
     var w = Math.abs(Math.min(args.rasterPixelBounds.min.x, 0));
-    var validpixelexpression = this.raster.data.length > 1 && this.options.validpixelexpression;
+    var validpixelexpression =
+      this.raster.data.length > 1 && this.options.validpixelexpression;
     for (let y = 0; y < args.plotHeight; y++) {
       let yy = Math.round(
         ((y + n) / (args.plotHeight + n + s)) * raster.height
@@ -321,6 +326,19 @@ L.FloatGeotiff = L.ImageOverlay.extend({
       }
     }
     return imageData;
+  },
+  _onMousemove: function (t) {
+    var e = this._queryValue(t);
+    this.fire("mousemove", e);
+  },
+
+  _onClick: function (t) {
+    var e = this._queryValue(t);
+    this.fire("click", e);
+  },
+  _queryValue: function (click) {
+    click["value"] = this.getValueAtLatLng(click.latlng.lat, click.latlng.lng)
+    return click;
   },
 });
 

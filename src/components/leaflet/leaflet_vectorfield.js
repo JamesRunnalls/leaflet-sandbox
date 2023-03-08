@@ -48,7 +48,6 @@ L.VectorField = (L.Layer ? L.Layer : L.Class).extend({
     map.on("click", this._onClick, this);
     map.on("moveend", this._reset, this);
     map.on("mousemove", this._onMousemove, this);
-
     if (map.options.zoomAnimation && L.Browser.any3d) {
       map.on("zoomanim", this._animateZoom, this);
     }
