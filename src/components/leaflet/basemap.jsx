@@ -183,11 +183,13 @@ class Basemap extends Component {
       maxBoundsViscosity: 0.5,
     });
 
-    var osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    }).addTo(this.map);
+    var mapbox = L.tileLayer(
+      "https://api.mapbox.com/styles/v1/jamesrunnalls/cleqzfoy7003g01s5napxn7ab/tiles/256/{z}/{x}/{y}?access_token=pk.eyJ1IjoiamFtZXNydW5uYWxscyIsImEiOiJjazk0ZG9zd2kwM3M5M2hvYmk3YW0wdW9yIn0.uIJUZoDgaC2LfdGtgMz0cQ",
+      {
+        maxZoom: 19,
+        attribution: "&copy; <a href='https://www.mapbox.com/'>mapbox</a>",
+      }
+    ).addTo(this.map);
 
     var sentinel2_wms = this.addSentinel(
       "https://services.sentinel-hub.com/ogc/wms/b8bf8b31-9b54-42b5-aad1-ab85ae32020e"
@@ -238,7 +240,7 @@ class Basemap extends Component {
     );
 
     var baseMaps = {
-      OpenStreetMap: osm,
+      mapbox: mapbox,
     };
 
     var overlayMaps = {
