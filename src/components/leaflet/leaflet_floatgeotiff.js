@@ -11,7 +11,10 @@ L.FloatGeotiff = L.ImageOverlay.extend({
       { color: [255, 255, 255], point: 0 },
       { color: [0, 0, 0], point: 1 },
     ],
+    invalidpixel: 1,
     validpixelexpression: true,
+    heightOffset: 0, // Temporary fix
+    widthOffset: 0,
   },
   initialize: async function (data, options) {
     this._url = "geotiff.tif";
@@ -68,6 +71,11 @@ L.FloatGeotiff = L.ImageOverlay.extend({
     this.raster.height = image.getHeight();
     if (isNaN(this.options.min)) this.options.min = min(this.raster.data[0]);
     if (isNaN(this.options.max)) this.options.max = max(this.raster.data[0]);
+    if (this.raster.data.length > 1) {
+      if (max(this.raster.data[1]) > 1) {
+        this.options.invalidpixel = 0;
+      }
+    }
     this._reset();
   },
   getValueAtLatLng: function (lat, lng) {
@@ -247,11 +255,13 @@ L.FloatGeotiff = L.ImageOverlay.extend({
       this.raster.data.length > 1 && this.options.validpixelexpression;
     for (let y = 0; y < args.plotHeight; y++) {
       let yy = Math.round(
-        ((y + n) / (args.plotHeight + n + s)) * raster.height
+        ((y + n) / (args.plotHeight + n + s)) *
+          (raster.height + this.options.heightOffset)
       );
       for (let x = 0; x < args.plotWidth; x++) {
         let xx = Math.round(
-          ((x + w) / (args.plotWidth + e + w)) * raster.width
+          ((x + w) / (args.plotWidth + e + w)) *
+            (raster.width + this.options.widthOffset)
         );
         let ii = yy * raster.width + xx;
         let i = y * args.plotWidth + x;
@@ -261,7 +271,9 @@ L.FloatGeotiff = L.ImageOverlay.extend({
           imgData.data[i * 4 + 1] = color[1];
           imgData.data[i * 4 + 2] = color[2];
           imgData.data[i * 4 + 3] = validpixelexpression
-            ? raster.data[1][ii]
+            ? raster.data[1][ii] === this.options.invalidpixel
+              ? 0
+              : 255
             : 255;
         } else {
           imgData.data[i * 4 + 0] = 0;
@@ -337,7 +349,7 @@ L.FloatGeotiff = L.ImageOverlay.extend({
     this.fire("click", e);
   },
   _queryValue: function (click) {
-    click["value"] = this.getValueAtLatLng(click.latlng.lat, click.latlng.lng)
+    click["value"] = this.getValueAtLatLng(click.latlng.lat, click.latlng.lng);
     return click;
   },
 });
