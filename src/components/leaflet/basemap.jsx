@@ -382,6 +382,14 @@ class Basemap extends Component {
       }
     ).addTo(this.map);
 
+    var mapbox = L.tileLayer(
+      "https://earthengine.googleapis.com/v1/projects/earthengine-legacy/maps/b5aabd36bb3cd302cb173b7acb7fef22-0ef8d2eb7e9f017c3b0ba1187ce8e0be/tiles/{z}/{x}/{y}",
+      {
+        maxZoom: 19,
+        attribution: "&copy; <a href='https://earthengine.google.com/'>Google Earth Engine</a>",
+      }
+    ).addTo(this.map);
+
     var sentinel2_wms = this.addSentinel(
       "https://services.sentinel-hub.com/ogc/wms/b8bf8b31-9b54-42b5-aad1-ab85ae32020e"
     );
