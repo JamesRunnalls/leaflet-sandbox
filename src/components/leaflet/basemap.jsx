@@ -386,7 +386,7 @@ class Basemap extends Component {
       "https://earthengine.googleapis.com/v1/projects/earthengine-legacy/maps/b5aabd36bb3cd302cb173b7acb7fef22-0ef8d2eb7e9f017c3b0ba1187ce8e0be/tiles/{z}/{x}/{y}",
       {
         maxZoom: 19,
-        attribution: "&copy; <a href='https://www.mapbox.com/'>mapbox</a>",
+        attribution: "&copy; <a href='https://www.mapbox.com/'>Google Earth Engine</a>",
       }
     ).addTo(this.map);
 
