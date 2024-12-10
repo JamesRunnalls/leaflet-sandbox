@@ -1,5 +1,5 @@
 import L from "leaflet";
-import { min, max } from "d3";
+import { min, max, mean } from "d3";
 import * as GeoTIFF from "geotiff";
 
 L.FloatGeotiff = L.ImageOverlay.extend({
@@ -7,29 +7,42 @@ L.FloatGeotiff = L.ImageOverlay.extend({
     opacity: 1,
     min: false,
     max: false,
+    unit: "",
+    colorRampSteps: 2,
     palette: [
       { color: [255, 255, 255], point: 0 },
       { color: [0, 0, 0], point: 1 },
     ],
     invalidpixel: 1,
     validpixelexpression: true,
-    heightOffset: 0, // Temporary fix
-    widthOffset: 0,
+    convolve: 0,
   },
   initialize: async function (data, options) {
     this._url = "geotiff.tif";
+    this.convolve = false;
     this._data = data;
     this.raster = {};
     L.Util.setOptions(this, options);
-    this._getData();
+    await this._processData();
+    this._convolve();
+    this._createColorRamp();
+    this._redraw();
+    if (document.getElementById("loading")) {
+      document.getElementById("loading").style.visibility = "hidden";
+    }
   },
-  changeOpacity: function (opacity) {
-    this._image.style.opacity = opacity;
-    this.options.opacity = opacity;
-  },
-  setData: function (newData) {
-    this._data = newData;
-    this._getData();
+  update: async function (data, options) {
+    L.Util.setOptions(this, options);
+    if (data !== false) {
+      this._data = data;
+      await this._processData();
+    }
+    this._convolve();
+    this._createColorRamp();
+    this._redraw();
+    if (document.getElementById("loading")) {
+      document.getElementById("loading").style.visibility = "hidden";
+    }
   },
   onAdd: function (map) {
     this._map = map;
@@ -38,23 +51,23 @@ L.FloatGeotiff = L.ImageOverlay.extend({
     }
     map._panes.overlayPane.appendChild(this._image);
     map.on("click", this._onClick, this);
-    map.on("moveend", this._reset, this);
+    map.on("moveend", this._redraw, this);
     map.on("mousemove", this._onMousemove, this);
     if (map.options.zoomAnimation && L.Browser.any3d) {
       map.on("zoomanim", this._animateZoom, this);
     }
-    this._reset();
+    this._redraw();
   },
   onRemove: function (map) {
     map.getPanes().overlayPane.removeChild(this._image);
-    map.off("moveend", this._reset, this);
+    map.off("moveend", this._redraw, this);
     map.off("click", this._onClick, this);
     map.off("mousemove", this._onMousemove, this);
     if (map.options.zoomAnimation) {
       map.off("zoomanim", this._animateZoom, this);
     }
   },
-  _getData: async function () {
+  _processData: async function () {
     const tiff = await GeoTIFF.fromArrayBuffer(this._data);
     const image = await tiff.getImage();
     var meta = image.getFileDirectory();
@@ -67,16 +80,79 @@ L.FloatGeotiff = L.ImageOverlay.extend({
       [y_max, x_max],
     ]);
     this.raster.data = await image.readRasters();
-    this.raster.width = image.getWidth();
-    this.raster.height = image.getHeight();
-    if (isNaN(this.options.min)) this.options.min = min(this.raster.data[0]);
-    if (isNaN(this.options.max)) this.options.max = max(this.raster.data[0]);
     if (this.raster.data.length > 1) {
       if (max(this.raster.data[1]) > 1) {
         this.options.invalidpixel = 0;
       }
     }
-    this._reset();
+    this.raster.width = image.getWidth();
+    this.raster.height = image.getHeight();
+    if (this.options.min === undefined)
+      this.options.min = min(this.raster.data[0]);
+    if (this.options.min === undefined)
+      this.options.max = max(this.raster.data[0]);
+    this.plotData = this.raster.data[0].slice(0);
+  },
+  _createConvolutionMatrix: function (n) {
+    var center = Math.floor(n / 2);
+    var matrix = new Array(n);
+    for (var i = 0; i < n; i++) {
+      matrix[i] = new Array(n);
+      for (var j = 0; j < n; j++) {
+        var diffX = j - center;
+        var diffY = i - center;
+        matrix[i][j] = [diffX, diffY];
+      }
+    }
+
+    return matrix;
+  },
+  _convolve: function () {
+    if (this.options.convolve !== this.convolve) {
+      if (this.options.convolve === 0) {
+        this.plotData = this.raster.data[0].slice(0);
+      } else {
+        var matrix = this._createConvolutionMatrix(
+          2 * this.options.convolve + 1
+        );
+        for (
+          var h = this.options.convolve;
+          h < this.raster.height - this.options.convolve;
+          h++
+        ) {
+          for (
+            var w = this.options.convolve;
+            w < this.raster.width - this.options.convolve;
+            w++
+          ) {
+            let index = h * this.raster.width + w;
+            if (
+              !isNaN(this.raster.data[0][index]) &&
+              this.raster.data[1][index] !== this.options.invalidpixel
+            ) {
+              var values = [];
+              for (var i = 0; i < matrix.length; i++) {
+                for (var j = 0; j < matrix.length; j++) {
+                  let wi = w + matrix[i][j][0];
+                  let hi = h + matrix[i][j][1];
+                  let ii = hi * this.raster.width + wi;
+                  if (
+                    !isNaN(this.raster.data[0][ii]) &&
+                    this.raster.data[1][ii] !== this.options.invalidpixel
+                  ) {
+                    values.push(this.raster.data[0][ii]);
+                  }
+                }
+              }
+              if (values.length > 0) {
+                this.plotData[index] = mean(values);
+              }
+            }
+          }
+        }
+      }
+      this.convolve = this.options.convolve;
+    }
   },
   getValueAtLatLng: function (lat, lng) {
     try {
@@ -126,7 +202,8 @@ L.FloatGeotiff = L.ImageOverlay.extend({
         ") ";
     }
   },
-  _reset: function () {
+  _reset: function () {},
+  _redraw: function () {
     if (this.hasOwnProperty("_map")) {
       if (this._rasterBounds) {
         this.topLeft = this._map.latLngToLayerPoint(
@@ -200,11 +277,49 @@ L.FloatGeotiff = L.ImageOverlay.extend({
       let ctx = plotCanvas.getContext("2d");
       ctx.clearRect(0, 0, plotCanvas.width, plotCanvas.height);
 
-      this._render(this.raster, plotCanvas, ctx, args);
+      this._render(ctx, args);
 
       this._image.src = String(plotCanvas.toDataURL());
       this._image.style.opacity = this.options.opacity;
+      this._image.style.zIndex = this.options.zIndex + 100;
     }
+  },
+  _createColorRamp: function () {
+    var _colorRamp = [];
+    var noSteps = 10 ** this.options.colorRampSteps;
+    var step = (this.options.max - this.options.min) / noSteps;
+    for (var i = 0; i < noSteps + 1; i++) {
+      let value = this.options.min + step * i;
+      var loc =
+        (value - this.options.min) / (this.options.max - this.options.min);
+
+      var index = 0;
+      for (var j = 0; j < this.options.palette.length - 1; j++) {
+        if (
+          loc >= this.options.palette[j].point &&
+          loc <= this.options.palette[j + 1].point
+        ) {
+          index = j;
+          break;
+        }
+      }
+
+      var color1 = this.options.palette[index].color;
+      var color2 = this.options.palette[index + 1].color;
+
+      var f =
+        (loc - this.options.palette[index].point) /
+        (this.options.palette[index + 1].point -
+          this.options.palette[index].point);
+
+      _colorRamp.push([
+        color1[0] + (color2[0] - color1[0]) * f,
+        color1[1] + (color2[1] - color1[1]) * f,
+        color1[2] + (color2[2] - color1[2]) * f,
+      ]);
+    }
+    this._colorRamp = _colorRamp;
+    return _colorRamp;
   },
   _getColor: function (value) {
     if (value === null || isNaN(value)) {
@@ -216,73 +331,59 @@ L.FloatGeotiff = L.ImageOverlay.extend({
     if (value < this.options.min) {
       return this.options.palette[0].color;
     }
-    var loc =
-      (value - this.options.min) / (this.options.max - this.options.min);
 
-    var index = 0;
-    for (var i = 0; i < this.options.palette.length - 1; i++) {
-      if (
-        loc >= this.options.palette[i].point &&
-        loc <= this.options.palette[i + 1].point
-      ) {
-        index = i;
-      }
-    }
-    var color1 = this.options.palette[index].color;
-    var color2 = this.options.palette[index + 1].color;
+    var index = Math.round(
+      ((value - this.options.min) / (this.options.max - this.options.min)) *
+        10 ** this.options.colorRampSteps
+    );
 
-    var f =
-      (loc - this.options.palette[index].point) /
-      (this.options.palette[index + 1].point -
-        this.options.palette[index].point);
-
-    var rgb = [
-      color1[0] + (color2[0] - color1[0]) * f,
-      color1[1] + (color2[1] - color1[1]) * f,
-      color1[2] + (color2[2] - color1[2]) * f,
-    ];
-
-    return rgb;
+    return this._colorRamp[index];
   },
-  _render: function (raster, plotCanvas, ctx, args) {
+  _render: function (ctx, args) {
     ctx.globalAlpha = this.options.opacity;
     var imgData = ctx.createImageData(args.plotWidth, args.plotHeight);
-    var n = Math.abs(Math.min(args.rasterPixelBounds.min.y, 0));
-    var e = Math.abs(Math.min(args.xFinish - args.rasterPixelBounds.max.x, 0));
-    var s = Math.abs(Math.min(args.yFinish - args.rasterPixelBounds.max.y, 0));
-    var w = Math.abs(Math.min(args.rasterPixelBounds.min.x, 0));
+    var e = Math.abs(Math.max(args.rasterPixelBounds.min.x, 0));
+    var n = Math.abs(Math.max(args.rasterPixelBounds.min.y, 0));
     var validpixelexpression =
       this.raster.data.length > 1 && this.options.validpixelexpression;
+    var rasterWidth = this.raster.width;
+    var rasterHeight = this.raster.height;
+    var boundsSW = this._rasterBounds._southWest;
+    var boundsNE = this._rasterBounds._northEast;
+    var latDiff = boundsNE.lat - boundsSW.lat;
+    var lngDiff = boundsNE.lng - boundsSW.lng;
+    var data = imgData.data;
+    var pixelIndex = 0;
     for (let y = 0; y < args.plotHeight; y++) {
-      let yy = Math.round(
-        ((y + n) / (args.plotHeight + n + s)) *
-          (raster.height + this.options.heightOffset)
-      );
       for (let x = 0; x < args.plotWidth; x++) {
-        let xx = Math.round(
-          ((x + w) / (args.plotWidth + e + w)) *
-            (raster.width + this.options.widthOffset)
+        let latLng = this._map.containerPointToLatLng([x + e, y + n]);
+        let xx = Math.floor(
+          (rasterWidth * (latLng.lng - boundsSW.lng)) / lngDiff
         );
-        let ii = yy * raster.width + xx;
-        let i = y * args.plotWidth + x;
-        let color = this._getColor(raster.data[0][ii]);
+        let yy =
+          rasterHeight -
+          Math.ceil((rasterHeight * (latLng.lat - boundsSW.lat)) / latDiff);
+        var ii = yy * rasterWidth + xx;
+        let color = this._getColor(this.plotData[ii]);
         if (color) {
-          imgData.data[i * 4 + 0] = color[0];
-          imgData.data[i * 4 + 1] = color[1];
-          imgData.data[i * 4 + 2] = color[2];
-          imgData.data[i * 4 + 3] = validpixelexpression
-            ? raster.data[1][ii] === this.options.invalidpixel
+          data[pixelIndex] = color[0];
+          data[pixelIndex + 1] = color[1];
+          data[pixelIndex + 2] = color[2];
+          data[pixelIndex + 3] = validpixelexpression
+            ? this.raster.data[1][ii] === this.options.invalidpixel
               ? 0
               : 255
             : 255;
         } else {
-          imgData.data[i * 4 + 0] = 0;
-          imgData.data[i * 4 + 1] = 0;
-          imgData.data[i * 4 + 2] = 0;
-          imgData.data[i * 4 + 3] = 0;
+          data[pixelIndex] = 0;
+          data[pixelIndex + 1] = 0;
+          data[pixelIndex + 2] = 0;
+          data[pixelIndex + 3] = 0;
         }
+        pixelIndex += 4;
       }
     }
+
     ctx.putImageData(imgData, args.xStart, args.yStart);
   },
   transform: function (rasterImageData, args) {
@@ -351,6 +452,14 @@ L.FloatGeotiff = L.ImageOverlay.extend({
   _queryValue: function (click) {
     click["value"] = this.getValueAtLatLng(click.latlng.lat, click.latlng.lng);
     return click;
+  },
+  getFeatureValue: function (e) {
+    const value = this.getValueAtLatLng(e.latlng.lat, e.latlng.lng);
+    if (isFinite(value)) {
+      return value;
+    } else {
+      return null;
+    }
   },
 });
 
