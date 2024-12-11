@@ -1,5 +1,5 @@
 import L from "leaflet";
-import { min, max, mean } from "d3";
+import { min, max } from "d3";
 import * as GeoTIFF from "geotiff";
 
 L.FloatGeotiff = L.ImageOverlay.extend({
@@ -112,44 +112,51 @@ L.FloatGeotiff = L.ImageOverlay.extend({
       if (this.options.convolve === 0) {
         this.plotData = this.raster.data[0].slice(0);
       } else {
-        var matrix = this._createConvolutionMatrix(
-          2 * this.options.convolve + 1
-        );
-        for (
-          var h = this.options.convolve;
-          h < this.raster.height - this.options.convolve;
-          h++
-        ) {
-          for (
-            var w = this.options.convolve;
-            w < this.raster.width - this.options.convolve;
-            w++
-          ) {
-            let index = h * this.raster.width + w;
-            if (
-              !isNaN(this.raster.data[0][index]) &&
-              this.raster.data[1][index] !== this.options.invalidpixel
-            ) {
-              var values = [];
-              for (var i = 0; i < matrix.length; i++) {
-                for (var j = 0; j < matrix.length; j++) {
-                  let wi = w + matrix[i][j][0];
-                  let hi = h + matrix[i][j][1];
-                  let ii = hi * this.raster.width + wi;
-                  if (
-                    !isNaN(this.raster.data[0][ii]) &&
-                    this.raster.data[1][ii] !== this.options.invalidpixel
-                  ) {
-                    values.push(this.raster.data[0][ii]);
-                  }
+        const multiband = this.raster.data.length > 1;
+        const width = this.raster.width;
+        const height = this.raster.height;
+        const convolveSize = this.options.convolve;
+        const offsets = [];
+        for (let i = -convolveSize; i <= convolveSize; i++) {
+          for (let j = -convolveSize; j <= convolveSize; j++) {
+            offsets.push([i, j]);
+          }
+        }
+
+        const rasterData = this.raster.data[0];
+        const validPixelCheck = (index) =>
+          !isNaN(rasterData[index]) &&
+          (!multiband ||
+            this.raster.data[1][index] !== this.options.invalidpixel);
+
+        const newPlotData = new Float32Array(width * height).fill(NaN);
+
+        for (let h = convolveSize; h < height - convolveSize; h++) {
+          for (let w = convolveSize; w < width - convolveSize; w++) {
+            const centerIndex = h * width + w;
+            if (validPixelCheck(centerIndex)) {
+              let sum = 0;
+              let count = 0;
+
+              for (const [dx, dy] of offsets) {
+                const neighborW = w + dx;
+                const neighborH = h + dy;
+                const neighborIndex = neighborH * width + neighborW;
+
+                if (validPixelCheck(neighborIndex)) {
+                  sum += rasterData[neighborIndex];
+                  count++;
                 }
               }
-              if (values.length > 0) {
-                this.plotData[index] = mean(values);
+
+              if (count > 0) {
+                newPlotData[centerIndex] = sum / count;
               }
             }
           }
         }
+
+        this.plotData = newPlotData;
       }
       this.convolve = this.options.convolve;
     }
